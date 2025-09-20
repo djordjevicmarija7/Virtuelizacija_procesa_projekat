@@ -34,15 +34,21 @@ namespace Client
 
             ChannelFactory<ISensorService> factory = new ChannelFactory<ISensorService>("SensorServiceEndpoint");
             ISensorService proxy=factory.CreateChannel();
-
-            SessionMeta meta = SessionMeta{
-                sessionId = sessionId,
-                StartTime=DateTime.UtcNow,
-                Volume=0,
-                C0=0,
-                No2=0,
-                Pressure=0
+            var meta = new SessionMeta
+            {
+                SessionId = sessionId,
+                StartTime = DateTime.UtcNow,
+                Volume = 0.0,
+                Pressure = 0.0,
+                CO = 0.0,
+                NO2 = 0.0,
+                LightLevel = 0.0,
+                TempDHT = 0.0,
+                TempBMP = 0.0,
+                Humidity = 0.0,
+                AirQuality = 0.0
             };
+
 
             var startRes = proxy.StartSession(meta);
             Console.WriteLine($"StartSession:{startRes.Message} Status={startRes.Status}");
@@ -102,18 +108,19 @@ namespace Client
 
                 sample = new SensorSample
                 {
-                    sessionId = sessionId,
+                    SessionId = sessionId,
                     Timestamp = timestamp,
-                    volume = volume,
-                    lightLevel = lightLevel,
-                    TemperatureDHT = tempDHT,
+                    Volume = volume,
+                    LightLevel = lightLevel,
+                    TempDHT = tempDHT,
                     Pressure = pressure,
+                    TempBMP = tempBMP,
                     Humidity = humidity,
                     AirQuality = airQuality,
-                    C0 = co,
-                    N02 = no2
-
+                    CO = co,
+                    NO2 = no2
                 };
+
                 return true;
             }
             catch(Exception ex)

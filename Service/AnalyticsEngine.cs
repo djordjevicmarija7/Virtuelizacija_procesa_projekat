@@ -57,7 +57,7 @@ namespace Service
             }
             if (!double.IsNaN(lastC0))
             {
-                double dC0 = s.C0 - lastC0;
+                double dC0 = s.CO- lastC0;
                 if (Math.Abs(dC0) > C0_threshold)
                 {
                     string dir = dC0 > 0 ? "iznad očekivanog" : "ispod očekivanog";
@@ -66,7 +66,7 @@ namespace Service
             }
             if (!double.IsNaN(lastN02))
             {
-                double dN02 = s.N02 - lastN02;
+                double dN02 = s.NO2 - lastN02;
                 if (Math.Abs(dN02) > N02_threshold)
                 {
                     string dir = dN02 > 0 ? "iznad očekivanog" : "ispod očekivanog";
@@ -74,8 +74,8 @@ namespace Service
                 }
             }
             lastPressure = s.Pressure;
-            lastC0 = s.C0;
-            lastN02 = s.N02;
+            lastC0 = s.CO;
+            lastN02 = s.NO2;
 
             return warnings;
         }

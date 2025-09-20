@@ -11,6 +11,7 @@ using System.Diagnostics.Eventing.Reader;
 using System.Diagnostics;
 using System.ServiceModel;
 using System.Collections;
+using Common;
 
 namespace Service
 {
@@ -28,7 +29,7 @@ namespace Service
         private static readonly Dictionary<string, FileSessionWriter> openSessions = new Dictionary<string, FileSessionWriter>();
         private static readonly Dictionary<string, AnalyticsEngine> analyticsForSession = new Dictionary<string, AnalyticsEngine>();
 
-        public OperatonResult StartSession(SessionMeta meta)
+        public OperationResult StartSession(SessionMeta meta)
         {
             if (meta == null)
             {
@@ -42,7 +43,7 @@ namespace Service
             Directory.CreateDirectory(storage);
             lock (sessionsLock)
             {
-                if (openSessions.ContainsKey(meta.sessionId))
+                if (openSessions.ContainsKey(meta.SessionId))
                 {
                     return new OperationResult { Success = false, Message = "Session already exists", Status = SessionStatus.IN_PROGRESS };
                 }

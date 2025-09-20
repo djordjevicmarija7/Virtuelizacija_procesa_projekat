@@ -29,22 +29,29 @@ namespace Service
         }
         public void WriteHeader()
         {
-            sessionWriter.WriteLine("SessionId,Timestamp,Volume,C0,N02,Pressure,Temperature,Humidity");
+ 
+            sessionWriter.WriteLine("SessionId,Timestamp,Volume,LightLevel,TempDHT,Pressure,TempBMP,Humidity,AirQuality,CO,NO2");
         }
         public void AppendSample(SensorSample s)
         {
-            string line = string.Format(CultureInfo.InvariantCulture, "{0},{1},{2},{3},{4},{5},{6},{7}",
-                 s.SessionId,
-                 s.Timestamp.ToString("o", CultureInfo.InvariantCulture),
-                 s.Volume.ToString(CultureInfo.InvariantCulture),
-                 s.C0.ToString(CultureInfo.InvariantCulture),
-                 s.N02.ToString(CultureInfo.InvariantCulture),
-                 s.Pressure.ToString(CultureInfo.InvariantCulture),
-                 s.Temperature.ToString(CultureInfo.InvariantCulture),
-                 s.Humidity.ToString(CultureInfo.InvariantCulture)
-                 );
+            string line = string.Format(CultureInfo.InvariantCulture,
+                "{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10}",
+                s.SessionId,
+                s.Timestamp.ToString("o", CultureInfo.InvariantCulture),
+                s.Volume.ToString(CultureInfo.InvariantCulture),
+                s.LightLevel.ToString(CultureInfo.InvariantCulture),
+                s.TempDHT.ToString(CultureInfo.InvariantCulture),
+                s.Pressure.ToString(CultureInfo.InvariantCulture),
+                s.TempBMP.ToString(CultureInfo.InvariantCulture),
+                s.Humidity.ToString(CultureInfo.InvariantCulture),
+                s.AirQuality.ToString(CultureInfo.InvariantCulture),
+                s.CO.ToString(CultureInfo.InvariantCulture),
+                s.NO2.ToString(CultureInfo.InvariantCulture)
+            );
+
             sessionWriter.WriteLine(line);
         }
+
         public void AppendReject(SensorSample s, string reason)
         {
             string line = string.Format(CultureInfo.InvariantCulture, "{0},{1},{2}",
