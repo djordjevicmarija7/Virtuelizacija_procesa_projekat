@@ -89,7 +89,7 @@ namespace Client
             try
             {
                 string[] kolone = line.Split(',');
-                if (kolone.Length < 7)
+                if (kolone.Length < 10)
                 {
                     error = "Insufficient columns";
                     return false;
