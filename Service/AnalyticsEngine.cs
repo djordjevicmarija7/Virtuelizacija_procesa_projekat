@@ -38,7 +38,7 @@ namespace Service
                 double dP = s.Pressure - lastPressure;
                 if (Math.Abs(dP) > P_threshold)
                 {
-                    string dir = dP > 0 ? "iznad očekivanog" : "ispod očekivanog";
+                    string dir = dP > 0 ? "iznad ocekivanog" : "ispod ocekivanog";
                     warnings.Add($"PressureSpike: |ΔP|={Math.Abs(dP):F2} > {P_threshold} ({dir})");
                 }
             }
