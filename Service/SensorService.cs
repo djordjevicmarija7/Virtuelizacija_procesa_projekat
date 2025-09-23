@@ -96,36 +96,55 @@ namespace Service
                 // defensively get or create analytics engine
                 if (!analyticsForSession.TryGetValue(sample.SessionId, out var engine))
                 {
-                    // Option A: create and store new engine
                     engine = new AnalyticsEngine(sample.SessionId);
                     analyticsForSession[sample.SessionId] = engine;
-
-                    // Optionally log that engine was missing
-                    // writer.AppendReject(sample, "Analytics engine was missing; created new one.");
                 }
 
                 try
                 {
-                    writer.AppendSample(sample);
-
+                    // 1) prvo analiziraj sample i prikupi warnings (ne upisuj u measurements pre analize)
                     var warnings = engine.ProcessSample(sample) ?? new List<string>();
-                    foreach (var w in warnings)
+
+                    if (warnings.Count > 0)
                     {
-                        OnWarningRaised?.Invoke(sample.SessionId, w);
+                        // Emituj upozorenja i zapiši u rejects
+                        foreach (var w in warnings)
+                        {
+                            OnWarningRaised?.Invoke(sample.SessionId, w);
+                        }
+
+                        // Zapiši sample u rejects.csv sa razlogom (warnings)
+                        try
+                        {
+                            writer.AppendReject(sample, warnings);
+                        }
+                        catch (Exception ex)
+                        {
+                            // ako pisanje rejects ne uspe, loguj (ne bacaj)
+                            try { OnWarningRaised?.Invoke(sample.SessionId, $"Failed to write reject: {ex.Message}"); } catch { }
+                        }
+
+                        // Ne pišemo sample u measurements
+                        OnSampleReceived?.Invoke(sample.SessionId, sample); // optional: ako želiš obaveštenje i za reject, možeš ukloniti ovu liniju
+                        return new OperationResult { Success = false, Message = "Sample rejected: " + string.Join(" | ", warnings), Status = SessionStatus.IN_PROGRESS };
                     }
-
-                    OnSampleReceived?.Invoke(sample.SessionId, sample);
-
-                    return new OperationResult { Success = true, Message = "Sample accepted", Status = SessionStatus.IN_PROGRESS };
+                    else
+                    {
+                        // Nema warnings — prihvati uzorak i upiši ga u measurements
+                        writer.AppendSample(sample);
+                        OnSampleReceived?.Invoke(sample.SessionId, sample);
+                        return new OperationResult { Success = true, Message = "Sample accepted", Status = SessionStatus.IN_PROGRESS };
+                    }
                 }
                 catch (Exception ex)
                 {
-                    // make sure writer exists before using it in catch (we have it via TryGetValue)
-                    try { writer.AppendReject(sample, ex.Message); } catch { /* ignore logging errors */ }
-                    return new OperationResult { Success = false, Message = "Failed to store sample: " + ex.Message, Status = SessionStatus.IN_PROGRESS };
+                    // ako bilo šta interno pukne, pokušaj log u rejects i vrati grešku
+                    try { writer.AppendReject(sample, new[] { "Exception: " + ex.Message }); } catch { /* ignore logging errors */ }
+                    return new OperationResult { Success = false, Message = "Failed to process sample: " + ex.Message, Status = SessionStatus.IN_PROGRESS };
                 }
             }
         }
+
 
         public OperationResult EndSession(string sessionId)
         {

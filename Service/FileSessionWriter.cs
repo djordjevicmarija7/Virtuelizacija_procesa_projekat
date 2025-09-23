@@ -19,10 +19,6 @@ namespace Service
 
         public string SessionFilePath { get; }
 
-        /// <summary>
-        /// Konstruktor otvara (ili kreira) session i rejects fajlove. 
-        /// Fajlovi se otvaraju za append tako da je bezbedno ponovo pokretati servis.
-        /// </summary>
         public FileSessionWriter(string sessionFilePath, string rejectsFilePath)
         {
             if (string.IsNullOrWhiteSpace(sessionFilePath)) throw new ArgumentNullException(nameof(sessionFilePath));
@@ -30,23 +26,21 @@ namespace Service
 
             SessionFilePath = sessionFilePath;
 
-            // Ensure directories exist
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(sessionFilePath)) ?? ".");
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(rejectsFilePath)) ?? ".");
 
-            // Open or create session file and position to end for append
             sessionFs = new FileStream(sessionFilePath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read);
             sessionFs.Seek(0, SeekOrigin.End);
             sessionWriter = new StreamWriter(sessionFs, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)) { AutoFlush = true };
 
-            // Open or create rejects file and position to end
             rejectsFs = new FileStream(rejectsFilePath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.Read);
             rejectsFs.Seek(0, SeekOrigin.End);
             rejectsWriter = new StreamWriter(rejectsFs, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)) { AutoFlush = true };
         }
 
         /// <summary>
-        /// Zapiše header samo ako je fajl prazan (sprečava višestruko pisanje headera).
+        /// Zapiši header-e ako su fajlovi prazni.
+        /// Writes both session measurements header and rejects header (if they are empty).
         /// </summary>
         public void WriteHeader()
         {
@@ -54,11 +48,17 @@ namespace Service
             {
                 try
                 {
-                    // Ako je fajl prazan (length == 0) napiši header
                     if (sessionFs.Length == 0)
                     {
                         sessionWriter.WriteLine("SessionId,Timestamp,Volume,LightLevel,TempDHT,Pressure,TempBMP,Humidity,AirQuality,CO,NO2");
                         sessionWriter.Flush();
+                    }
+
+                    if (rejectsFs.Length == 0)
+                    {
+                        // Rejects header contains the full sample columns + Warnings
+                        rejectsWriter.WriteLine("SessionId,Timestamp,Volume,LightLevel,TempDHT,Pressure,TempBMP,Humidity,AirQuality,CO,NO2,Warnings");
+                        rejectsWriter.Flush();
                     }
                 }
                 catch (ObjectDisposedException) { /* ignore if disposed */ }
@@ -99,33 +99,48 @@ namespace Service
         }
 
         /// <summary>
-        /// Zapisuje odbaceni sample u rejects CSV zajedno sa razlogom.
-        /// Ako sample == null, zapisuje minimalne informacije (sessionId i reason).
+        /// Zapisuje odbaceni sample u rejects CSV zajedno sa razlogom/warnings.
+        /// Piše kompletan sample + spojena upozorenja u poslednjoj koloni.
         /// </summary>
-        public void AppendReject(SensorSample s, string reason)
+        public void AppendReject(SensorSample s, IEnumerable<string> warnings)
         {
+            if (warnings == null) warnings = Enumerable.Empty<string>();
+
             lock (writeLock)
             {
                 try
                 {
-                    string safeReason = (reason ?? string.Empty).Replace("\r", " ").Replace("\n", " ").Replace("\"", "'");
+                    string warnJoined = string.Join(" | ", warnings).Replace("\r", " ").Replace("\n", " ").Replace("\"", "'");
 
                     if (s != null)
                     {
                         string line = string.Format(CultureInfo.InvariantCulture,
-                            "{0},{1},{2}",
+                            "{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},\"{11}\"",
                             EscapeForCsv(s.SessionId ?? string.Empty),
                             s.Timestamp.ToString("o", CultureInfo.InvariantCulture),
-                            EscapeForCsv(safeReason));
+                            s.Volume.ToString(CultureInfo.InvariantCulture),
+                            s.LightLevel.ToString(CultureInfo.InvariantCulture),
+                            s.TempDHT.ToString(CultureInfo.InvariantCulture),
+                            s.Pressure.ToString(CultureInfo.InvariantCulture),
+                            s.TempBMP.ToString(CultureInfo.InvariantCulture),
+                            s.Humidity.ToString(CultureInfo.InvariantCulture),
+                            s.AirQuality.ToString(CultureInfo.InvariantCulture),
+                            s.CO.ToString(CultureInfo.InvariantCulture),
+                            s.NO2.ToString(CultureInfo.InvariantCulture),
+                            // warnings are quoted to be safe (we already removed quote chars above)
+                            warnJoined
+                        );
+
                         rejectsWriter.WriteLine(line);
                     }
                     else
                     {
-                        // fallback: only reason
+                        // fallback minimal record
                         string line = string.Format(CultureInfo.InvariantCulture,
-                            "{0},{1}",
+                            "{0},{1},,,,,,,,,,,\"{2}\"",
+                            EscapeForCsv(string.Empty),
                             DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture),
-                            EscapeForCsv(safeReason));
+                            warnJoined);
                         rejectsWriter.WriteLine(line);
                     }
 
@@ -135,13 +150,11 @@ namespace Service
             }
         }
 
-        // Simple CSV escaping for fields that may contain commas/newlines.
         private static string EscapeForCsv(string field)
         {
             if (field == null) return string.Empty;
             if (field.Contains(',') || field.Contains('"') || field.Contains('\n') || field.Contains('\r'))
             {
-                // Double quotes inside field must be doubled according to CSV rules
                 string doubled = field.Replace("\"", "\"\"");
                 return $"\"{doubled}\"";
             }
@@ -155,7 +168,6 @@ namespace Service
             {
                 if (disposing)
                 {
-                    // managed resources
                     try { sessionWriter?.Flush(); } catch { }
                     try { sessionWriter?.Dispose(); } catch { }
                     try { sessionFs?.Dispose(); } catch { }
