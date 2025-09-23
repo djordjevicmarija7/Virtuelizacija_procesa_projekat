@@ -10,8 +10,8 @@ namespace Common
         [DataMember] public DateTime StartTime { get; set; }
         [DataMember] public double Volume { get; set; }
         [DataMember] public double Pressure { get; set; }
-        [DataMember] public double CO { get; set; }    
-        [DataMember] public double NO2 { get; set; }    
+        [DataMember] public double C0 { get; set; }    
+        [DataMember] public double N02 { get; set; }    
         [DataMember] public double LightLevel { get; set; }
         [DataMember] public double TempDHT { get; set; }
         [DataMember] public double TempBMP { get; set; }
@@ -31,8 +31,8 @@ namespace Common
         [DataMember] public double TempBMP { get; set; }       
         [DataMember] public double Humidity { get; set; }     
         [DataMember] public double AirQuality { get; set; }   
-        [DataMember] public double CO { get; set; }           
-        [DataMember] public double NO2 { get; set; }         
+        [DataMember] public double C0 { get; set; }           
+        [DataMember] public double N02 { get; set; }         
     }
 
     [DataContract]

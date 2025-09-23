@@ -83,8 +83,8 @@ namespace Service
                 s.TempBMP.ToString(CultureInfo.InvariantCulture),
                 s.Humidity.ToString(CultureInfo.InvariantCulture),
                 s.AirQuality.ToString(CultureInfo.InvariantCulture),
-                s.CO.ToString(CultureInfo.InvariantCulture),
-                s.NO2.ToString(CultureInfo.InvariantCulture)
+                s.C0.ToString(CultureInfo.InvariantCulture),
+                s.N02.ToString(CultureInfo.InvariantCulture)
             );
 
             lock (writeLock)
@@ -125,8 +125,8 @@ namespace Service
                             s.TempBMP.ToString(CultureInfo.InvariantCulture),
                             s.Humidity.ToString(CultureInfo.InvariantCulture),
                             s.AirQuality.ToString(CultureInfo.InvariantCulture),
-                            s.CO.ToString(CultureInfo.InvariantCulture),
-                            s.NO2.ToString(CultureInfo.InvariantCulture),
+                            s.C0.ToString(CultureInfo.InvariantCulture),
+                            s.N02.ToString(CultureInfo.InvariantCulture),
                             // warnings are quoted to be safe (we already removed quote chars above)
                             warnJoined
                         );

@@ -40,8 +40,8 @@ namespace Client
                 StartTime = DateTime.UtcNow,
                 Volume = 0.0,
                 Pressure = 0.0,
-                CO = 0.0,
-                NO2 = 0.0,
+                C0 = 0.0,
+                N02 = 0.0,
                 LightLevel = 0.0,
                 TempDHT = 0.0,
                 TempBMP = 0.0,
@@ -102,8 +102,8 @@ namespace Client
                 double tempBMP = double.Parse(kolone[5], CultureInfo.InvariantCulture);
                 double humidity = double.Parse(kolone[6], CultureInfo.InvariantCulture);
                 double airQuality = double.Parse(kolone[7], CultureInfo.InvariantCulture);
-                double co = double.Parse(kolone[8], CultureInfo.InvariantCulture);
-                double no2 = double.Parse(kolone[9], CultureInfo.InvariantCulture);
+                double c0 = double.Parse(kolone[8], CultureInfo.InvariantCulture);
+                double n02 = double.Parse(kolone[9], CultureInfo.InvariantCulture);
 
 
                 sample = new SensorSample
@@ -117,8 +117,8 @@ namespace Client
                     TempBMP = tempBMP,
                     Humidity = humidity,
                     AirQuality = airQuality,
-                    CO = co,
-                    NO2 = no2
+                    C0 = c0,
+                    N02 = n02
                 };
 
                 return true;
