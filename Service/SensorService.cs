@@ -39,8 +39,13 @@ namespace Service
             {
                 throw new FaultException<ValidationFault>(new ValidationFault("SessionId required"));
             }
+
             var storage = ConfigurationManager.AppSettings["StorageRoot"];
+            if (string.IsNullOrWhiteSpace(storage))
+                throw new FaultException<ValidationFault>(new ValidationFault("StorageRoot not configured"));
+
             Directory.CreateDirectory(storage);
+
             lock (sessionsLock)
             {
                 if (openSessions.ContainsKey(meta.SessionId))
@@ -54,14 +59,22 @@ namespace Service
                 string sessionFile = Path.Combine(sessionFolder, "measurements_session.csv");
                 string rejectsFile = Path.Combine(sessionFolder, "rejects.csv");
 
-                FileSessionWriter writer = new FileSessionWriter(sessionFile, rejectsFile);
+                var writer = new FileSessionWriter(sessionFile, rejectsFile);
                 writer.WriteHeader();
 
                 openSessions.Add(meta.SessionId, writer);
-                AnalyticsEngine engine = new AnalyticsEngine(meta.SessionId);
+
+                // IMPORTANT: add analytics engine to dictionary
+                var engine = new AnalyticsEngine(meta.SessionId);
+                analyticsForSession.Add(meta.SessionId, engine);
+
+                // notify subscribers
+                OnTransferStarted?.Invoke(meta.SessionId);
+
                 return new OperationResult { Success = true, Message = "Session started", Status = SessionStatus.IN_PROGRESS };
             }
         }
+
         public OperationResult PushSample(SensorSample sample)
         {
             if (sample == null)
@@ -72,48 +85,64 @@ namespace Service
             {
                 throw new FaultException<ValidationFault>(new ValidationFault("Pressure must be > 0"));
             }
+
             lock (sessionsLock)
             {
-                if (!openSessions.ContainsKey(sample.SessionId))
+                if (!openSessions.TryGetValue(sample.SessionId, out var writer))
+                {
                     return new OperationResult { Success = false, Message = "Session not found", Status = SessionStatus.IN_PROGRESS };
+                }
 
-                var writer = openSessions[sample.SessionId];
-                var engine = analyticsForSession[sample.SessionId];
+                // defensively get or create analytics engine
+                if (!analyticsForSession.TryGetValue(sample.SessionId, out var engine))
+                {
+                    // Option A: create and store new engine
+                    engine = new AnalyticsEngine(sample.SessionId);
+                    analyticsForSession[sample.SessionId] = engine;
+
+                    // Optionally log that engine was missing
+                    // writer.AppendReject(sample, "Analytics engine was missing; created new one.");
+                }
+
                 try
                 {
                     writer.AppendSample(sample);
 
-                    var warnings = engine.ProcessSample(sample);
+                    var warnings = engine.ProcessSample(sample) ?? new List<string>();
                     foreach (var w in warnings)
                     {
                         OnWarningRaised?.Invoke(sample.SessionId, w);
                     }
+
                     OnSampleReceived?.Invoke(sample.SessionId, sample);
 
                     return new OperationResult { Success = true, Message = "Sample accepted", Status = SessionStatus.IN_PROGRESS };
                 }
                 catch (Exception ex)
                 {
-                    writer.AppendReject(sample, ex.Message);
+                    // make sure writer exists before using it in catch (we have it via TryGetValue)
+                    try { writer.AppendReject(sample, ex.Message); } catch { /* ignore logging errors */ }
                     return new OperationResult { Success = false, Message = "Failed to store sample: " + ex.Message, Status = SessionStatus.IN_PROGRESS };
                 }
             }
         }
+
         public OperationResult EndSession(string sessionId)
         {
             lock (sessionsLock)
             {
-                if (!openSessions.ContainsKey(sessionId))
+                if (!openSessions.TryGetValue(sessionId, out var writer))
                     return new OperationResult { Success = false, Message = "Session not found", Status = SessionStatus.COMPLETED };
 
-                var writer = openSessions[sessionId];
-                writer.Dispose(); 
+                // dispose writer safely
+                try { writer.Dispose(); } catch { /* ignore disposal exceptions */ }
 
                 openSessions.Remove(sessionId);
 
                 if (analyticsForSession.ContainsKey(sessionId))
                 {
-                    analyticsForSession.Remove(sessionId);
+                    try { analyticsForSession[sessionId] = null; analyticsForSession.Remove(sessionId); }
+                    catch { /* ignore */ }
                 }
 
                 OnTransferCompleted?.Invoke(sessionId);
@@ -121,6 +150,7 @@ namespace Service
                 return new OperationResult { Success = true, Message = "Session completed", Status = SessionStatus.COMPLETED };
             }
         }
+
     }
 }
 
