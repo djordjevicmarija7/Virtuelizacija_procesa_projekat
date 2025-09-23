@@ -31,8 +31,6 @@ namespace Service
         public List<string> ProcessSample(SensorSample s)
         {
             var warnings = new List<string>();
-
-            // 1) Pressure spike check (delta from last pressure) — isto kao pre
             if (!double.IsNaN(lastPressure))
             {
                 double dP = s.Pressure - lastPressure;
@@ -43,7 +41,6 @@ namespace Service
                 }
             }
 
-            // 2) Out-of-band check: koristi PRETHODNI runningPressureMean (strogo prethodni)
             if (pressureCount > 0)
             {
                 double lower = runningPressureMean * (1 - PercentDeviation / 100.0);
@@ -54,11 +51,9 @@ namespace Service
                     warnings.Add($"OutOfBandWarning: Pressure {s.Pressure:F2} > upper {upper:F2} (session mean {runningPressureMean:F2})");
             }
 
-            // 3) After checks, update running mean using the current sample
             pressureCount++;
             runningPressureMean = runningPressureMean + (s.Pressure - runningPressureMean) / pressureCount;
 
-            // 4) CO spike (C0)
             if (!double.IsNaN(lastC0))
             {
                 double dC0 = s.C0 - lastC0;
@@ -69,7 +64,6 @@ namespace Service
                 }
             }
 
-            // 5) NO2 spike
             if (!double.IsNaN(lastN02))
             {
                 double dN02 = s.N02 - lastN02;
@@ -80,7 +74,6 @@ namespace Service
                 }
             }
 
-            // 6) Update last values for next invocation
             lastPressure = s.Pressure;
             lastC0 = s.C0;
             lastN02 = s.N02;

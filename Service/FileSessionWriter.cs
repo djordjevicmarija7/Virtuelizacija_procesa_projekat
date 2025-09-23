@@ -38,10 +38,6 @@ namespace Service
             rejectsWriter = new StreamWriter(rejectsFs, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)) { AutoFlush = true };
         }
 
-        /// <summary>
-        /// Zapiši header-e ako su fajlovi prazni.
-        /// Writes both session measurements header and rejects header (if they are empty).
-        /// </summary>
         public void WriteHeader()
         {
             lock (writeLock)
@@ -56,18 +52,14 @@ namespace Service
 
                     if (rejectsFs.Length == 0)
                     {
-                        // Rejects header contains the full sample columns + Warnings
                         rejectsWriter.WriteLine("SessionId,Timestamp,Volume,LightLevel,TempDHT,Pressure,TempBMP,Humidity,AirQuality,CO,NO2,Warnings");
                         rejectsWriter.Flush();
                     }
                 }
-                catch (ObjectDisposedException) { /* ignore if disposed */ }
+                catch (ObjectDisposedException) {  }
             }
         }
 
-        /// <summary>
-        /// Dodaje jedan sample u session CSV (redosled kolona mora odgovarati specifikaciji).
-        /// </summary>
         public void AppendSample(SensorSample s)
         {
             if (s == null) throw new ArgumentNullException(nameof(s));
@@ -94,14 +86,10 @@ namespace Service
                     sessionWriter.WriteLine(line);
                     sessionWriter.Flush();
                 }
-                catch (ObjectDisposedException) { /* if disposing/closed, ignore or rethrow depending on policy */ }
+                catch (ObjectDisposedException) { }
             }
         }
 
-        /// <summary>
-        /// Zapisuje odbaceni sample u rejects CSV zajedno sa razlogom/warnings.
-        /// Piše kompletan sample + spojena upozorenja u poslednjoj koloni.
-        /// </summary>
         public void AppendReject(SensorSample s, IEnumerable<string> warnings)
         {
             if (warnings == null) warnings = Enumerable.Empty<string>();
@@ -127,7 +115,6 @@ namespace Service
                             s.AirQuality.ToString(CultureInfo.InvariantCulture),
                             s.C0.ToString(CultureInfo.InvariantCulture),
                             s.N02.ToString(CultureInfo.InvariantCulture),
-                            // warnings are quoted to be safe (we already removed quote chars above)
                             warnJoined
                         );
 
@@ -135,7 +122,6 @@ namespace Service
                     }
                     else
                     {
-                        // fallback minimal record
                         string line = string.Format(CultureInfo.InvariantCulture,
                             "{0},{1},,,,,,,,,,,\"{2}\"",
                             EscapeForCsv(string.Empty),
@@ -146,7 +132,7 @@ namespace Service
 
                     rejectsWriter.Flush();
                 }
-                catch (ObjectDisposedException) { /* ignore */ }
+                catch (ObjectDisposedException) { }
             }
         }
 

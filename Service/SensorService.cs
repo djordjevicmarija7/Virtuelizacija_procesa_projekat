@@ -64,11 +64,8 @@ namespace Service
 
                 openSessions.Add(meta.SessionId, writer);
 
-                // IMPORTANT: add analytics engine to dictionary
                 var engine = new AnalyticsEngine(meta.SessionId);
                 analyticsForSession.Add(meta.SessionId, engine);
-
-                // notify subscribers
                 OnTransferStarted?.Invoke(meta.SessionId);
 
                 return new OperationResult { Success = true, Message = "Session started", Status = SessionStatus.IN_PROGRESS };
@@ -77,13 +74,12 @@ namespace Service
 
         public OperationResult PushSample(SensorSample sample)
         {
-            // basic data-format check
+
             if (sample == null)
             {
                 throw new FaultException<DataFormatFault>(new DataFormatFault("Sample is null"));
             }
 
-            // --- VALIDATION PHASE
             if (string.IsNullOrWhiteSpace(sample.SessionId))
             {
                 throw new FaultException<ValidationFault>(new ValidationFault("SessionId is required on sample"));
@@ -94,7 +90,6 @@ namespace Service
                 throw new FaultException<ValidationFault>(new ValidationFault("Timestamp is missing or invalid"));
             }
 
-            // Use Action for void-returning validator
             Action<double, string> assertFinite = (v, name) =>
             {
                 if (double.IsNaN(v) || double.IsInfinity(v))
@@ -141,46 +136,37 @@ namespace Service
                 {
                     engine = new AnalyticsEngine(sample.SessionId);
                     analyticsForSession[sample.SessionId] = engine;
-                    // If you want to record this as a warning, use the warnings collection below.
                 }
 
                 try
-                {
-                    // analysis first (so rejected samples don't pollute stats) — optional
+                { 
                     var warnings = engine.ProcessSample(sample) ?? new List<string>();
                     if (warnings.Count > 0)
                     {
-                        // emit warnings
                         foreach (var w in warnings) OnWarningRaised?.Invoke(sample.SessionId, w);
 
-                        // write to rejects as collection (AppendReject expects IEnumerable<string>)
                         try
                         {
                             writer.AppendReject(sample, warnings);
                         }
                         catch (Exception ex)
                         {
-                            // if writing reject fails, log a fallback warning
                             try { OnWarningRaised?.Invoke(sample.SessionId, $"Failed to write reject: {ex.Message}"); } catch { }
                         }
-
-                        // do not append to measurements
                         return new OperationResult { Success = false, Message = "Sample rejected: " + string.Join(" | ", warnings), Status = SessionStatus.IN_PROGRESS };
                     }
 
-                    // no warnings -> persist to measurements
                     writer.AppendSample(sample);
                     OnSampleReceived?.Invoke(sample.SessionId, sample);
                     return new OperationResult { Success = true, Message = "Sample accepted", Status = SessionStatus.IN_PROGRESS };
                 }
-                catch (FaultException) // rethrow existing FaultExceptions untouched
+                catch (FaultException) 
                 {
                     throw;
                 }
                 catch (Exception ex)
                 {
-                    // ensure rejects capture exception as collection
-                    try { writer.AppendReject(sample, new[] { "Exception: " + ex.Message }); } catch { /* ignore logging errors */ }
+                    try { writer.AppendReject(sample, new[] { "Exception: " + ex.Message }); } catch {  }
                     return new OperationResult { Success = false, Message = "Failed to process sample: " + ex.Message, Status = SessionStatus.IN_PROGRESS };
                 }
             }
@@ -194,15 +180,14 @@ namespace Service
                 if (!openSessions.TryGetValue(sessionId, out var writer))
                     return new OperationResult { Success = false, Message = "Session not found", Status = SessionStatus.COMPLETED };
 
-                // dispose writer safely
-                try { writer.Dispose(); } catch { /* ignore disposal exceptions */ }
+                try { writer.Dispose(); } catch {  }
 
                 openSessions.Remove(sessionId);
 
                 if (analyticsForSession.ContainsKey(sessionId))
                 {
                     try { analyticsForSession[sessionId] = null; analyticsForSession.Remove(sessionId); }
-                    catch { /* ignore */ }
+                    catch { }
                 }
 
                 OnTransferCompleted?.Invoke(sessionId);
